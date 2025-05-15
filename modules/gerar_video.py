@@ -193,3 +193,69 @@ def gerar_video_real(pasta_entrada, pasta_recursos, saida="video-final.mp4"):
     ], check=True)
 
     return saida
+
+# --- Versão leve sem overlay de vídeo ---
+def gerar_video_real(pasta_entrada, pasta_recursos, saida="video-final.mp4"):
+    audio_path = encontrar_arquivos_por_extensao(pasta_entrada, "mp3")
+    legenda_path = encontrar_arquivos_por_extensao(pasta_entrada, "srt")
+    csv_path = encontrar_arquivos_por_extensao(pasta_entrada, "csv")
+    imagens = glob.glob(os.path.join(pasta_entrada, "*.jpg")) + glob.glob(os.path.join(pasta_entrada, "*.png"))
+
+    if not all([audio_path, legenda_path, csv_path]) or not imagens:
+        raise Exception("Faltam arquivos obrigatórios na pasta de entrada.")
+
+    df = pd.read_csv(csv_path)
+    if "prompt" not in df.columns:
+        raise Exception("Coluna 'prompt' não encontrada no CSV.")
+
+    prompts = df["prompt"].tolist()
+    imagem_para_tempo = []
+
+    for prompt in prompts:
+        tempo, texto = prompt.split(" ", 1)
+        tempo = int(tempo)
+        melhor_imagem = max(imagens, key=lambda img: similaridade(Path(img).stem, texto))
+        imagem_para_tempo.append((tempo, melhor_imagem))
+
+    imagem_para_tempo.sort(key=lambda x: x[0])
+    fechamento_path = os.path.join(pasta_recursos, "fechamento.png")
+    marca_path = os.path.join(pasta_recursos, "sobrepor.png")
+
+    if not os.path.exists(fechamento_path) or not os.path.exists(marca_path):
+        raise Exception("Arquivo de recursos (fechamento ou sobrepor.png) não encontrado.")
+
+    imagem_para_tempo.append((imagem_para_tempo[-1][0] + 4, fechamento_path))
+
+    with open("lista.txt", "w") as f:
+        for i in range(len(imagem_para_tempo)):
+            tempo_atual, img = imagem_para_tempo[i]
+            tempo_proximo = imagem_para_tempo[i + 1][0] if i + 1 < len(imagem_para_tempo) else tempo_atual + 4
+            duracao = tempo_proximo - tempo_atual
+            f.write(f"file '{img}'\n")
+            f.write(f"duration {duracao}\n")
+
+    subprocess.run([
+        "ffmpeg", "-y",
+        "-f", "concat", "-safe", "0", "-i", "lista.txt",
+        "-vsync", "vfr",
+        "-pix_fmt", "yuv420p",
+        "base.mp4"
+    ], check=True)
+
+    marca_fim = imagem_para_tempo[-1][0]
+
+    subprocess.run([
+        "ffmpeg", "-y",
+        "-i", "base.mp4",
+        "-i", marca_path,
+        "-i", audio_path,
+        "-vf", f"subtitles='{legenda_path}',overlay=W-w-10:H-h-10:enable='lt(t,{marca_fim})'",
+        "-map", "0:v",
+        "-map", "2:a",
+        "-c:v", "libx264",
+        "-c:a", "aac",
+        "-shortest",
+        saida
+    ], check=True)
+
+    return saida
