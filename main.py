@@ -1,12 +1,21 @@
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+# Permitir que o ChatGPT acesse o OpenAPI via browser
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # necessário para funcionar com GPT Builder
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 @app.get("/gerar-video/")
 async def gerar_video(link: str = Query(..., description="Link público do Google Drive com os arquivos")):
-    # Aqui entra a lógica de processamento real
     return JSONResponse(content={
         "status": "em_processo",
         "mensagem": "Seu vídeo está sendo gerado. Isso pode levar alguns minutos.",
