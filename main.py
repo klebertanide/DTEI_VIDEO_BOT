@@ -2,10 +2,11 @@ from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
+from modules.gerar_video import gerar_video_dummy, extrair_pasta_id, upload_para_drive
 
-app = FastAPI(openapi_url=None)  # ← isso desativa o schema padrão
+app = FastAPI(openapi_url=None)
 
-# Permite que o GPT Builder acesse
+# CORS para integração com o GPT Builder
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -16,12 +17,20 @@ app.add_middleware(
 
 @app.get("/gerar-video/")
 async def gerar_video(link: str = Query(..., description="Link público do Google Drive com os arquivos")):
-    return JSONResponse(content={
-        "status": "em_processo",
-        "mensagem": "Seu vídeo está sendo gerado. Isso pode levar alguns minutos.",
-        "link_recebido": link,
-        "link_video_final": "https://example.com/video-final.mp4"
-    })
+    try:
+        pasta_id = extrair_pasta_id(link)
+        video_path = gerar_video_dummy()
+        link_video = upload_para_drive(video_path, pasta_id)
+
+        return JSONResponse(content={
+            "status": "concluído",
+            "mensagem": "Vídeo gerado com sucesso!",
+            "link_recebido": link,
+            "link_video_final": link_video
+        })
+
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"erro": str(e)})
 
 @app.get("/openapi.json")
 async def custom_openapi():
