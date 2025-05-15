@@ -3,12 +3,12 @@ from fastapi.responses import JSONResponse
 from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
+app = FastAPI(openapi_url=None)  # ← isso desativa o schema padrão
 
-# Permitir que o ChatGPT acesse o OpenAPI via browser
+# Permite que o GPT Builder acesse
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # necessário para funcionar com GPT Builder
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
